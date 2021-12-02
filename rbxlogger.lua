@@ -4,10 +4,11 @@ local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local LogFileName = tostring(game.PlaceId).."-"..math.floor(tick()).."-"..Players.LocalPlayer.Name..".txt"
 local Messages = ""
+local LogHash = nil
 local function GetTimeStamp()
     return os.date("%d/%m/%Y-%H:%M:%S") 
 end
-
+local LastUpdatedHash = GetTimeStamp()
 local TotalLines = 0
 
 local function GenerateLogMessage(Subject,Message)
@@ -19,6 +20,7 @@ local function WriteToLog(message)
     appendfile("RbxLogger/"..LogFileName,"\n"..message) 
 end
 local function WriteAsScript(Message)
+    LogHash = syn.crypt.hash(tostring(game.PlaceId)..MarketplaceService:GetProductInfo(game.PlaceId).Name..game.JobId..tostring(game.PlaceVersion)..tostring(TotalLines+2)..Messages)
     WriteToLog(GenerateLogMessage("RBXLOGGER",Message))
 end
 local function GenerateUserInfo(player)
@@ -42,12 +44,17 @@ local PlayerAddedConnection = Players.PlayerAdded:Connect(function(player)
 end)
 
 local PlayerLeavingConnection = Players.PlayerRemoving:connect(function(player)
-    WriteToLog(GenerateLogMessage("PLAYEREVENT",GenerateUserInfo(player).." left the game"))
-    if player == Players.LocalPlayer then
+    if player.Name == Players.LocalPlayer.Name then
+        WriteToLog(GenerateLogMessage("RBXLOGGER","LOGHASH-SHA-384 FROM "..LastUpdatedHash.." "..tostring(LogHash)))
+        WriteToLog(GenerateLogMessage("RBXLOGGER","IGNORE ALL MESSAGES BELOW, RBX SESSION ENDED, TOTAL LOGS WRITTEN: "..tostring(TotalLines+1)))
         PlayerLeavingConnection:Disconnect()
         PlayerAddedConnection:Disconnect()
-        LogHash = syn.crypt.hash(tostring(game.PlaceId)..MarketplaceService:GetProductInfo(game.PlaceId).Name..game.JobId..tostring(game.PlaceVersion)..tostring(TotalLines+2)..Messages)
-        WriteAsScript("LOGHASH-SHA-384 "..tostring(LogHash))
-        WriteAsScript("RBX SESSION ENDED, TOTAL LOGS WRITTEN: "..tostring(TotalLines+1))
     end
+    WriteToLog(GenerateLogMessage("PLAYEREVENT",GenerateUserInfo(player).." left the game"))
 end)
+
+while true do
+    task.wait(2)
+    LogHash = syn.crypt.hash(tostring(game.PlaceId)..MarketplaceService:GetProductInfo(game.PlaceId).Name..game.JobId..tostring(game.PlaceVersion)..tostring(TotalLines+2)..Messages)
+    LastUpdatedHash = GetTimeStamp()
+end
